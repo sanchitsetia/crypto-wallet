@@ -2,9 +2,19 @@
 
 import * as React from "react";
 import { ChevronsUpDown, Plus, X } from "lucide-react";
+import { derivePath } from "ed25519-hd-key";
+import { Keypair } from "@solana/web3.js";
 
 import { Button } from "@/components/ui/button";
-import { generateMnemonic } from "bip39";
+import { generateMnemonic, mnemonicToSeedSync } from "bip39";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 import {
   Collapsible,
@@ -12,13 +22,15 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
-import Wallet from "./Wallet";
+import nacl from "tweetnacl";
 
 const Mneumonic = () => {
   const [isOpen, setIsOpen] = React.useState(false);
   const [mnemonic, setMnemonic] = React.useState("");
   const [isWalletGenerate, setIsWalletgenerated] = React.useState(false);
   const inputRef = React.useRef(null);
+  const [walletIndex, setWalletIndex] = React.useState(0);
+  const [wallets, setWallets] = React.useState([]);
 
   const createWallet = async () => {
     let generatedMneumonic = inputRef.current?.value.trim();
@@ -27,9 +39,18 @@ const Mneumonic = () => {
     }
     setMnemonic(generatedMneumonic);
     setIsWalletgenerated(true);
+  };
 
-    // const mn = await generateMnemonic();
-    // setMnemonic(mn);
+  const addWallet = () => {
+    setWalletIndex((prev) => prev + 1);
+    const seed = mnemonicToSeedSync(mnemonic);
+    const path = `m/44'/501'/${walletIndex}'/0'`;
+    const derivedSeed = derivePath(path, seed.toString("hex")).key;
+    const secret = nacl.sign.keyPair.fromSeed(derivedSeed).secretKey;
+    setWallets((prev) => [
+      ...prev,
+      Keypair.fromSecretKey(secret).publicKey.toBase58(),
+    ]);
   };
 
   return (
@@ -48,7 +69,7 @@ const Mneumonic = () => {
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center">
-          <div className="flex justify-center mt-10">
+          <div className="flex justify-center mt-10 min-w-[50%]">
             <Collapsible
               open={isOpen}
               onOpenChange={setIsOpen}
@@ -74,7 +95,24 @@ const Mneumonic = () => {
             </Collapsible>
           </div>
           <div className="mt-10">
-            <Wallet />
+            <span className="text-4xl flex justify-center">Solana Wallets</span>
+            <div className="mt-5 flex justify-center">
+              <Button variant={"secondary"} onClick={addWallet}>
+                Add wallet
+              </Button>
+            </div>
+            {wallets.map((w) => (
+              <div className="mt-10">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Wallet - {walletIndex}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p>Public Key - {w}</p>
+                  </CardContent>
+                </Card>
+              </div>
+            ))}
           </div>
         </div>
       )}
